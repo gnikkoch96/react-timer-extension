@@ -1,22 +1,30 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'public/manifest.json',
+          dest: '.',
+        },
+      ],
+    }),
+  ],
   build: {
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'index.html'),
-        background: resolve(__dirname, 'src/background.ts'),
+        popup: resolve(import.meta.dirname, 'index.html'),
+        background: resolve(import.meta.dirname, 'src/background.ts'),
       },
       output: {
-        entryFileNames: (chunkInfo) => {
-          if (chunkInfo.name === 'background') {
-            return 'src/background.js';
-          }
-          return 'assets/[name]-[hash].js';
-        },
+        entryFileNames: '[name].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
   },
