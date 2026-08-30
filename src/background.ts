@@ -89,6 +89,25 @@ function startTimer(durationMinutes: number, label: string) {
   });
 }
 
+async function playAlarmSound() {
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
+  });
+
+  if (existingContexts.length === 0) {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+      justification: 'Play notification sound when timer finishes'
+    });
+  }
+
+  chrome.runtime.sendMessage({
+    type: 'PLAY_AUDIO',
+    soundUrl: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'
+  });
+}
+
 // Alarm trigger listener
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'activeTimer') {
@@ -96,11 +115,16 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       const label = result.timerLabel || 'Timer';
       chrome.storage.local.remove(['timerEndTime', 'timerLabel']);
 
+      // 1. Play sound
+      playAlarmSound();
+
+      // 2. Trigger desktop notification
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'https://www.google.com/favicon.ico',
         title: "Time's Up!",
         message: `${label} has completed!`,
+        priority: 2
       });
     });
   }
