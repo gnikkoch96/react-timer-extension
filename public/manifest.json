@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "React Timer Extension",
+  "version": "1.0",
+  "description": "A quick timer app triggered directly from your context menu.",
+  "permissions": [
+    "contextMenus",
+    "alarms",
+    "notifications",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  }
+}
