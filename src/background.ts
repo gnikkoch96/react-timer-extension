@@ -2,13 +2,14 @@ export interface TimerPreset {
   id: string;
   label: string;
   minutes: number;
+  sound?: string; // e.g. 'chime', 'digital', 'bell'
 }
 
 // Default presets if the user hasn't created any yet
 const DEFAULT_PRESETS: TimerPreset[] = [
-  { id: 'preset-5', label: '5 Minutes', minutes: 5 },
-  { id: 'preset-15', label: '15 Minutes', minutes: 15 },
-  { id: 'preset-25', label: '25 Minutes (Pomodoro)', minutes: 25 },
+  { id: "preset-5", label: "5 Minutes", minutes: 5 },
+  { id: "preset-15", label: "15 Minutes", minutes: 15 },
+  { id: "preset-25", label: "25 Minutes (Pomodoro)", minutes: 25 },
 ];
 
 // Rebuild the parent and child context menu items
@@ -16,15 +17,16 @@ async function updateContextMenus() {
   chrome.contextMenus.removeAll(() => {
     // Parent menu item
     chrome.contextMenus.create({
-      id: 'parent-timer-menu',
-      title: 'Start Timer',
-      contexts: ['all'],
+      id: "parent-timer-menu",
+      title: "Start Timer",
+      contexts: ["all"],
     });
 
     // Fetch active presets from storage
-    chrome.storage.local.get(['timerPresets'], (result) => {
+    chrome.storage.local.get(["timerPresets"], (result) => {
       // Safely fall back to DEFAULT_PRESETS if result.timerPresets is undefined or empty
-      const presets: TimerPreset[] = (result.timerPresets as TimerPreset[]) || DEFAULT_PRESETS;
+      const presets: TimerPreset[] =
+        (result.timerPresets as TimerPreset[]) || DEFAULT_PRESETS;
 
       if (!result.timerPresets) {
         chrome.storage.local.set({ timerPresets: DEFAULT_PRESETS });
@@ -34,9 +36,9 @@ async function updateContextMenus() {
       presets.forEach((preset) => {
         chrome.contextMenus.create({
           id: `preset-${preset.id}`,
-          parentId: 'parent-timer-menu',
+          parentId: "parent-timer-menu",
           title: preset.label,
-          contexts: ['all'],
+          contexts: ["all"],
         });
       });
     });
@@ -54,18 +56,19 @@ chrome.runtime.onStartup.addListener(() => {
 
 // Listen for updates from React UI when presets are modified
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === 'REFRESH_CONTEXT_MENU') {
+  if (message.type === "REFRESH_CONTEXT_MENU") {
     updateContextMenus();
   }
 });
 
 // Handle right-click context menu selections
 chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId.toString().startsWith('preset-')) {
-    const presetId = info.menuItemId.toString().replace('preset-', '');
+  if (info.menuItemId.toString().startsWith("preset-")) {
+    const presetId = info.menuItemId.toString().replace("preset-", "");
 
-    chrome.storage.local.get(['timerPresets'], (result) => {
-      const presets: TimerPreset[] = (result.timerPresets as TimerPreset[]) || DEFAULT_PRESETS;
+    chrome.storage.local.get(["timerPresets"], (result) => {
+      const presets: TimerPreset[] =
+        (result.timerPresets as TimerPreset[]) || DEFAULT_PRESETS;
       const selected = presets.find((p) => p.id === presetId);
 
       if (selected) {
@@ -75,11 +78,15 @@ chrome.contextMenus.onClicked.addListener((info) => {
   }
 });
 
-function startTimer(durationMinutes: number, label: string) {
+function startTimer(durationMinutes: number, label: string, sound: string = 'chime') {
   const endTime = Date.now() + durationMinutes * 60 * 1000;
 
   chrome.alarms.create('activeTimer', { delayInMinutes: durationMinutes });
-  chrome.storage.local.set({ timerEndTime: endTime, timerLabel: label });
+  chrome.storage.local.set({ 
+    timerEndTime: endTime, 
+    timerLabel: label, 
+    timerSound: sound 
+  });
 
   chrome.notifications.create({
     type: 'basic',
@@ -89,7 +96,7 @@ function startTimer(durationMinutes: number, label: string) {
   });
 }
 
-async function playAlarmSound() {
+async function playAlarmSound(soundName: string = 'chime') {
   const existingContexts = await chrome.runtime.getContexts({
     contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]
   });
@@ -102,21 +109,26 @@ async function playAlarmSound() {
     });
   }
 
+  // Dynamically resolve local .ogg file path
+  const soundUrl = chrome.runtime.getURL(`sounds/${soundName}.ogg`);
+
   chrome.runtime.sendMessage({
     type: 'PLAY_AUDIO',
-    soundUrl: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'
+    soundUrl: soundUrl
   });
 }
 
-// Alarm trigger listener
+// When alarm triggers, read the chosen sound from storage
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'activeTimer') {
-    chrome.storage.local.get(['timerLabel'], (result) => {
-      const label = result.timerLabel || 'Timer';
-      chrome.storage.local.remove(['timerEndTime', 'timerLabel']);
+    chrome.storage.local.get(['timerLabel', 'timerSound'], (result) => {
+      const label = (result.timerLabel as string) || 'Timer';
+      const sound = (result.timerSound as string) || 'chime';
 
-      // 1. Play sound
-      playAlarmSound();
+      chrome.storage.local.remove(['timerEndTime', 'timerLabel', 'timerSound']);
+
+      // 1. Play chosen dynamic sound
+      playAlarmSound(sound);
 
       // 2. Trigger desktop notification
       chrome.notifications.create({
