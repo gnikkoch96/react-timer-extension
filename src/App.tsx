@@ -1,122 +1,91 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Helper function to check remaining time from chrome.storage
+    const checkTimer = () => {
+      chrome.storage.local.get(["timerEndTime"], (result) => {
+        // Cast result.timerEndTime to a number
+        const endTime = result.timerEndTime as number | undefined;
+
+        if (endTime) {
+          const remaining = Math.max(
+            0,
+            Math.ceil((endTime - Date.now()) / 1000),
+          );
+          if (remaining > 0) {
+            setTimeLeft(remaining);
+          } else {
+            setTimeLeft(null);
+          }
+        } else {
+          setTimeLeft(null);
+        }
+      });
+    };
+
+    // Check immediately on open
+    checkTimer();
+
+    // Update the UI tick every second
+    const interval = setInterval(checkTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Format seconds into MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const cancelTimer = () => {
+    chrome.alarms.clear("activeTimer");
+    chrome.storage.local.remove(["timerEndTime", "timerDuration"]);
+    setTimeLeft(null);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div
+      style={{
+        width: "220px",
+        padding: "16px",
+        fontFamily: "sans-serif",
+        textAlign: "center",
+      }}
+    >
+      <h3 style={{ margin: "0 0 12px 0" }}>React Timer</h3>
+
+      {timeLeft !== null ? (
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+          <div
+            style={{ fontSize: "32px", fontWeight: "bold", margin: "12px 0" }}
+          >
+            {formatTime(timeLeft)}
+          </div>
+          <button
+            onClick={cancelTimer}
+            style={{
+              padding: "6px 12px",
+              backgroundColor: "#ef4444",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Cancel Timer
+          </button>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      ) : (
+        <p style={{ color: "#666", fontSize: "14px" }}>
+          No active timer running. Right-click anywhere on a webpage to start
+          one!
+        </p>
+      )}
+    </div>
+  );
 }
-
-export default App
